@@ -1,0 +1,112 @@
+---
+title: "PA2_Project"
+author: "Paul Vinod"
+date: "12/09/2020"
+output:
+  html_document:
+    df_print: paged
+---
+
+Weather Affect on Human and Economic 
+==========================================
+
+This is a report on National Storm data which would be focusing on following key objectives:
+- How much harm has been provide to population?
+- How much damage it has been provided on the economy?
+
+The first question is addressed by condiering the fatalities and injuries. Whereas the second question includes crop and property damages. 
+
+Collecting the data from online sources:
+```{r}
+# Loading libraries.
+library(dplyr)
+library(grDevices)
+library(ggplot2)
+
+# Download files
+filename = "CourseProject2.csv.bz2"
+if(!file.exists(filename))
+{
+    fileUrl <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+    download.file(fileUrl,
+                  destfile = filename,
+                  method = "curl")
+
+}
+
+valDT <- read.csv(bzfile("CourseProject2.csv.bz2"),
+                  header = TRUE)
+x <- dim(valDT)
+```
+5
+The data contains `x[1]` observations and `x[2]` variables. Our focus would be on the variable EVTYPE which contains various parameters. Clubing these parameters to following: "FLOOD"   "HAIL"    "HEAT"    "OTHER"   "RAIN"    "SNOW"    "STORM"   "TORNADO" "WIND"    "WINTER" 
+
+```{r}
+valDT$EVENT <- "OTHER"
+valDT$EVENT[grep("RAIN", valDT$EVTYPE, ignore.case = TRUE)] <- "RAIN"
+valDT$EVENT[grep("HAIL", valDT$EVTYPE, ignore.case = TRUE)] <- "HAIL"
+valDT$EVENT[grep("TORNADO", valDT$EVTYPE, ignore.case = TRUE)] <- "TORNADO"
+valDT$EVENT[grep("HEAT", valDT$EVTYPE, ignore.case = TRUE)] <- "HEAT"
+valDT$EVENT[grep("SNOW", valDT$EVTYPE, ignore.case = TRUE)] <- "SNOW"
+valDT$EVENT[grep("STORM", valDT$EVTYPE, ignore.case = TRUE)] <- "STORM"
+valDT$EVENT[grep("WINTER", valDT$EVTYPE, ignore.case = TRUE)] <- "WINTER"
+valDT$EVENT[grep("WIND", valDT$EVTYPE, ignore.case = TRUE)] <- "WIND"
+valDT$EVENT[grep("FLOOD", valDT$EVTYPE, ignore.case = TRUE)] <- "FLOOD"
+```
+
+Similary converting the property and crop damage expenses to numeric values. 
+K = 10^3; M = 10^6, B = 10^9
+```{r results = FALSE}
+valDT$PROPDMGEXP[!grepl("K|M|B", valDT$PROPDMGEXP,ignore.case = T)] < - 0
+valDT$CROPDMGEXP[!grepl("K|M|B", valDT$CROPDMGEXP,ignore.case = T)] < - 0
+
+valDT$PROPDMGEXP[valDT$PROPDMGEXP == "B"|valDT$PROPDMGEXP == "b" ]  <- 9
+valDT$PROPDMGEXP[valDT$PROPDMGEXP == "M"|valDT$PROPDMGEXP == "m" ]  <- 6
+valDT$PROPDMGEXP[valDT$PROPDMGEXP == "K"|valDT$PROPDMGEXP == "k" ]  <- 3
+valDT$PROPDMGEXP <- as.numeric(valDT$PROPDMGEXP)
+valDT$PROPDMGEXP[is.na(valDT$PROPDMGEXP)] <- 0
+
+valDT$CROPDMGEXP[valDT$CROPDMGEXP == "B"|valDT$CROPDMGEXP == "b" ]  <- 9
+valDT$CROPDMGEXP[valDT$CROPDMGEXP == "M"|valDT$CROPDMGEXP == "m" ]  <- 6
+valDT$CROPDMGEXP[valDT$CROPDMGEXP == "K"|valDT$CROPDMGEXP == "k" ]  <- 3
+valDT$CROPDMGEXP <- as.numeric(valDT$CROPDMGEXP)
+valDT$CROPDMGEXP[is.na(valDT$CROPDMGEXP)] <- 0
+```
+
+Calculating the overall damages caused by each of property and crop. 
+```{r}
+valDT$cropdamage <- valDT$CROPDMG * 10^valDT$CROPDMGEXP
+valDT$propdamage <- valDT$PROPDMG * 10^valDT$PROPDMGEXP
+```
+
+Grouping these collected information by EVENT. 
+```{r}
+valDT_clean <- valDT %>% group_by(EVENT) %>%
+               summarise(net_fatal = sum(FATALITIES),
+                net_injuries = sum(INJURIES),
+                net_crop_damage = sum(cropdamage),
+                net_prop_damage = sum(propdamage))
+print(valDT_clean)
+```
+
+Plotting the responses of **Human health and population**
+```{r}
+par(mfrow = c(1,2))
+barplot(height = valDT_clean$net_fatal, names.arg = valDT_clean$EVENT,
+        col = "red", xlab = "Events", ylab = "Fatalities", ylim = c(0,6000))
+
+barplot(height = valDT_clean$net_injuries, names.arg = valDT_clean$EVENT,
+        col = "blue",  xlab = "Events", ylab = "Injuries", ylim = c(0,95000))
+title(main = "Human health and population Loss")
+
+```
+Plotting the responses of **Economy loss by crop and property damages**
+```{r}
+par(mfrow = c(2,1))
+barplot(height = valDT_clean$net_crop_damage/10000000, names.arg = valDT_clean$EVENT,
+        col = "blue", width = 2, ylim = c(0,2500))
+
+barplot(height = valDT_clean$net_prop_damage/10000000, names.arg = valDT_clean$EVENT,col = "red", width = 2, ylim = c(0, 20000))
+
+title(main = "Economy Loss by Crop and Property Damage")
+```
