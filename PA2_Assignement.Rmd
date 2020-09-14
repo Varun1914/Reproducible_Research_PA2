@@ -5,10 +5,11 @@ date: "12/09/2020"
 output:
   html_document:
     df_print: paged
+  pdf_document: default
 ---
 
-Weather Affect on Human and Economic 
-==========================================
+# Weather Affect on Human and Economic 
+## 1. Introduction
 
 This is a report on National Storm data which would be focusing on following key objectives:
 - How much harm has been provide to population?
@@ -17,11 +18,12 @@ This is a report on National Storm data which would be focusing on following key
 The first question is addressed by condiering the fatalities and injuries. Whereas the second question includes crop and property damages. 
 
 Collecting the data from online sources:
-```{r}
+```{r CACHE = TRUE}
 # Loading libraries.
 library(dplyr)
 library(grDevices)
 library(ggplot2)
+library(tidyr)
 
 # Download files
 filename = "CourseProject2.csv.bz2"
@@ -38,9 +40,14 @@ valDT <- read.csv(bzfile("CourseProject2.csv.bz2"),
                   header = TRUE)
 x <- dim(valDT)
 ```
-5
-The data contains `x[1]` observations and `x[2]` variables. Our focus would be on the variable EVTYPE which contains various parameters. Clubing these parameters to following: "FLOOD"   "HAIL"    "HEAT"    "OTHER"   "RAIN"    "SNOW"    "STORM"   "TORNADO" "WIND"    "WINTER" 
 
+### 1.1 Dimemnsion of Data Set
+The data contains `r x[1]` observations and `r x[2]` variables. Our focus would be on the variable EVTYPE which contains various parameters.
+
+## 2. Data Processing
+
+The data need to be cleaned on the basis of EVTYPE and modified to the following list. 
+"FLOOD"   "HAIL"    "HEAT"    "OTHER"   "RAIN"    "SNOW"    "STORM"   "TORNADO" "WIND"    "WINTER" 
 ```{r}
 valDT$EVENT <- "OTHER"
 valDT$EVENT[grep("RAIN", valDT$EVTYPE, ignore.case = TRUE)] <- "RAIN"
@@ -54,7 +61,7 @@ valDT$EVENT[grep("WIND", valDT$EVTYPE, ignore.case = TRUE)] <- "WIND"
 valDT$EVENT[grep("FLOOD", valDT$EVTYPE, ignore.case = TRUE)] <- "FLOOD"
 ```
 
-Similary converting the property and crop damage expenses to numeric values. 
+Similarly converting the property and crop damage expenses to numeric values. 
 K = 10^3; M = 10^6, B = 10^9
 ```{r results = FALSE}
 valDT$PROPDMGEXP[!grepl("K|M|B", valDT$PROPDMGEXP,ignore.case = T)] < - 0
@@ -73,6 +80,7 @@ valDT$CROPDMGEXP <- as.numeric(valDT$CROPDMGEXP)
 valDT$CROPDMGEXP[is.na(valDT$CROPDMGEXP)] <- 0
 ```
 
+### 2.1 Calculating the Crop and Property Damage
 Calculating the overall damages caused by each of property and crop. 
 ```{r}
 valDT$cropdamage <- valDT$CROPDMG * 10^valDT$CROPDMGEXP
@@ -81,32 +89,42 @@ valDT$propdamage <- valDT$PROPDMG * 10^valDT$PROPDMGEXP
 
 Grouping these collected information by EVENT. 
 ```{r}
-valDT_clean <- valDT %>% group_by(EVENT) %>%
-               summarise(net_fatal = sum(FATALITIES),
-                net_injuries = sum(INJURIES),
-                net_crop_damage = sum(cropdamage),
-                net_prop_damage = sum(propdamage))
-print(valDT_clean)
+valDT_pop <- valDT %>% group_by(EVENT) %>%
+                summarise(net_fatal = sum(FATALITIES),
+                net_injuries = sum(INJURIES)) %>%
+                gather("TYPE", "Value", -EVENT)
+valDT_eco <- valDT %>% group_by(EVENT) %>%
+                summarise(net_crop_damage = sum(cropdamage),
+                net_prop_damage = sum(propdamage)) %>%
+                gather("TYPE", "Value", -EVENT)
+print(valDT_pop)
+print(valDT_eco)
 ```
 
-Plotting the responses of **Human health and population**
+## 3. Results
+
+### 3.1Plotting the information
+Plotting the information of the damages caused on the human capital by visualizing the fatalities and injuries in perspective of each EVENT.
+
+### 3.2 Plotting of Population Effect
 ```{r}
-par(mfrow = c(1,2))
-barplot(height = valDT_clean$net_fatal, names.arg = valDT_clean$EVENT,
-        col = "red", xlab = "Events", ylab = "Fatalities", ylim = c(0,6000))
-
-barplot(height = valDT_clean$net_injuries, names.arg = valDT_clean$EVENT,
-        col = "blue",  xlab = "Events", ylab = "Injuries", ylim = c(0,95000))
-title(main = "Human health and population Loss")
-
+plot_pop = ggplot(valDT_pop, aes(x = EVENT, y = Value, fill = TYPE)) +
+       geom_bar(stat = "identity")+
+       facet_wrap(TYPE~.)
+print(plot_pop)
 ```
-Plotting the responses of **Economy loss by crop and property damages**
+
+
+### 3.3 Plotting of Economic Damage
 ```{r}
-par(mfrow = c(2,1))
-barplot(height = valDT_clean$net_crop_damage/10000000, names.arg = valDT_clean$EVENT,
-        col = "blue", width = 2, ylim = c(0,2500))
-
-barplot(height = valDT_clean$net_prop_damage/10000000, names.arg = valDT_clean$EVENT,col = "red", width = 2, ylim = c(0, 20000))
-
-title(main = "Economy Loss by Crop and Property Damage")
+plot_eco = ggplot(valDT_eco, aes(x = EVENT, y = Value, fill = TYPE)) +
+       geom_bar(stat = "identity")+
+       facet_wrap(TYPE~.)
+print(plot_eco)
 ```
+
+## 4. Summary
+Thus with the analysis of the above two graphs we can see that the National Weather caused an immense impact on the both population and economics. Key takeaways include:
+-Population health impact graph Tornado had the highest fatality.
+-Economic graph the Flood caused highes impact on the property. 
+-In Economic graph the effect on the crop was relatively less. 
